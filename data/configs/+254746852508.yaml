@@ -1,0 +1,33 @@
+ai_key: ''
+ai_max_length: 20
+allow_keywords:
+- 🎰
+- 抽奖
+- 福利抽奖
+- 抽奖资格
+- 加入
+- 工兵值
+- 加成
+- 开奖日期
+- 兑奖
+- 半价
+- 优惠券
+api_hash: bd3793da28922b292d34b3db68ccacf7
+api_id: 32841554
+block_keywords:
+- 佛山
+- 深圳
+context_count: 5
+forbidden_words: []
+group_max: 100
+group_min: 40
+max_delay: 240
+messages_per_day: 21
+min_delay: 120
+monitor_channel: Haifpcj
+proxy: ''
+sleep_end: 8
+sleep_start: 0
+system_prompt: 你是群里的活跃成员，请友好地参与聊天。
+target_groups: []
+weight: 1

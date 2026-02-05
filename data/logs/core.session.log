@@ -1,0 +1,3 @@
+2026-02-05 07:25:53,553 - core.session - ERROR - Sign in failed: The asyncio event loop must not change after connection (see the FAQ for details)
+2026-02-05 07:32:08,384 - core.session - ERROR - Sign in failed: The asyncio event loop must not change after connection (see the FAQ for details)
+2026-02-05 07:36:50,057 - core.session - ERROR - Sign in failed: The asyncio event loop must not change after connection (see the FAQ for details)
