@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG Matrix Bot - 任务看板</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-icon">🤖</span>
+                <span class="brand-text">TG Matrix Bot</span>
+            </div>
+            
+            <!-- Global Stats -->
+            <div class="global-stats">
+                <div class="stat-pill">
+                    <span class="stat-icon">🟢</span>
+                    <span class="stat-value" id="g_active">0</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-icon">💬</span>
+                    <span class="stat-value" id="g_msg">0</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-icon">🎯</span>
+                    <span class="stat-value" id="g_giveaway">0</span>
+                </div>
+            </div>
+            
+            <!-- Account List -->
+            <div class="account-list-header">
+                <span>📋 账号看板</span>
+                <span class="account-count" id="accountCount">0</span>
+            </div>
+            <div class="account-list" id="accountList"></div>
+            
+            <!-- FAB (Left Side) -->
+            <button class="fab-add-left" onclick="showModal()" title="添加账号">+</button>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Task Header: 核心决策 -->
+            <div class="task-header" id="taskHeader">
+                <div class="header-left">
+                    <div class="account-status-card">
+                        <div class="status-avatar">
+                            <span class="avatar-icon">📱</span>
+                            <div class="breathing-indicator" id="breathingIndicator"></div>
+                        </div>
+                        <div class="account-brief">
+                            <span class="brief-phone" id="briefPhone">选择账号</span>
+                            <span class="brief-status" id="briefStatus">等待激活</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-center">
+                    <!-- Health Metrics -->
+                    <div class="health-metrics">
+                        <div class="metric-item">
+                            <span class="metric-label">健康度</span>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="healthBar" style="width: 100%"></div>
+                            </div>
+                            <span class="metric-value" id="healthValue">100%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">活跃度</span>
+                            <span class="metric-value" id="activityLevel">适中</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">今日收益</span>
+                            <span class="metric-value" id="todayEarnings">0 次抽奖</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-right">
+                    <button class="btn btn-primary btn-large" onclick="startAll()" id="startAllBtn">
+                        <span class="btn-icon">▶️</span>
+                        <span class="btn-text">启动任务</span>
+                    </button>
+                    <button class="btn btn-secondary btn-large" onclick="stopAll()" id="stopAllBtn" style="display:none">
+                        <span class="btn-icon">⏸️</span>
+                        <span class="btn-text">暂停任务</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Main Body: 漏斗式布局 -->
+            <div class="task-body">
+                
+                <!-- Main Left: 行为策略 -->
+                <div class="main-left">
+                    
+                    <!-- Strategy Card: System Prompt -->
+                    <div class="strategy-card">
+                        <div class="card-header">
+                            <h3 class="card-title">🎭 人设策略</h3>
+                            <div class="preset-buttons">
+                                <button class="preset-btn" onclick="loadPrompt('路人')">👤 路人</button>
+                                <button class="preset-btn" onclick="loadPrompt('水军')">🎭 水军</button>
+                                <button class="preset-btn" onclick="loadPrompt('专业')">💼 专业</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Risk Indicator -->
+                            <div class="risk-indicator">
+                                <span class="risk-label">封号风险：</span>
+                                <div class="risk-bar">
+                                    <div class="risk-fill" id="riskBar" style="width: 30%"></div>
+                                </div>
+                                <span class="risk-value" id="riskValue">低</span>
+                            </div>
+                            
+                            <!-- Prompt Input -->
+                            <textarea class="strategy-input" id="strategyPrompt" 
+                                placeholder="定义机器人的性格和对话风格..."
+                                oninput="updateRiskLevel()"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Trigger Keywords -->
+                    <div class="keywords-card">
+                        <div class="card-header">
+                            <h3 class="card-title">🎯 触发关键词</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="keywords-section">
+                                <label class="section-label">✅ 监控关键词 - 抽奖</label>
+                                <div class="keyword-hint">检测抽奖消息的关键词</div>
+                                <div id="allowTagsContainer" class="keyword-input-area"></div>
+                                <textarea id="conf_allow" style="display:none" onchange="markModified()"></textarea>
+                            </div>
+                            <div class="keywords-section">
+                                <label class="section-label">🚫 屏蔽关键词 - 全部</label>
+                                <div class="keyword-hint">屏蔽所有任务的关键词</div>
+                                <div id="blockTagsContainer" class="keyword-input-area"></div>
+                                <textarea id="conf_block" style="display:none" onchange="markModified()"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Main Right: 目标管理 -->
+                <div class="main-right">
+                    
+                    <!-- Target Groups -->
+                    <div class="target-card">
+                        <div class="card-header">
+                            <h3 class="card-title">👥 目标群组</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group compact">
+                                <label class="form-label">📺 监控频道</label>
+                                <input type="text" class="form-input" id="conf_monitor" 
+                                    placeholder="Haifpcj" onchange="markModified()">
+                            </div>
+                            <div class="form-group compact">
+                                <label class="form-label">🎯 目标群组 (每行一个)</label>
+                                <textarea class="form-textarea" id="conf_groups" 
+                                    style="height:100px" 
+                                    placeholder="https://t.me/group_name"
+                                    onchange="markModified()"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Network & API (Collapsible) -->
+                    <div class="settings-card collapsible" id="settingsCard">
+                        <div class="card-header" onclick="toggleSettings()">
+                            <h3 class="card-title">⚙️ 网络与 API</h3>
+                            <span class="toggle-icon" id="settingsToggle">▼</span>
+                        </div>
+                        <div class="card-body" id="settingsBody" style="display:none">
+                            <div class="form-grid-2">
+                                <div class="form-group compact">
+                                    <label class="form-label">🔒 SOCKS5 代理</label>
+                                    <input type="text" class="form-input" id="conf_proxy" 
+                                        placeholder="host:port:user:pass" onchange="markModified()">
+                                </div>
+                                <div class="form-group compact">
+                                    <label class="form-label">🔑 DeepSeek API</label>
+                                    <div class="password-input-container">
+                                        <input type="password" class="form-input" id="conf_ai_key" 
+                                            placeholder="sk-..." onchange="markModified()">
+                                        <button class="password-toggle" onclick="togglePassword('conf_ai_key')">👁️</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-grid-2">
+                                <div class="form-group compact">
+                                    <label class="form-label">⏱️ 最小延迟</label>
+                                    <input type="number" class="form-input" id="conf_min" value="120" onchange="markModified()">
+                                </div>
+                                <div class="form-group compact">
+                                    <label class="form-label">⏱️ 最大延迟</label>
+                                    <input type="number" class="form-input" id="conf_max" value="240" onchange="markModified()">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <button class="btn btn-secondary" onclick="saveConfig()">
+                                    💾 保存配置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backfill -->
+                    <div class="backfill-card">
+                        <div class="card-header">
+                            <h3 class="card-title">📜 历史补录</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="backfill-actions">
+                                <select class="form-select" id="backfillDays">
+                                    <option value="1">昨天</option>
+                                    <option value="3">最近3天</option>
+                                    <option value="7">最近7天</option>
+                                </select>
+                                <button class="btn btn-gift" onclick="runBackfill()">
+                                    🚀 扫描补录
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Right Panel: Event Console -->
+        <aside class="right-panel" id="rightPanel">
+            <button class="close-toggle" onclick="toggleRightPanel()">×</button>
+            
+            <div class="console-header">
+                <span class="console-title">📊 事件监控</span>
+                <div class="console-stats">
+                    <span class="console-stat success" id="successCount">✓ 0</span>
+                    <span class="console-stat warning" id="warningCount">⚠ 0</span>
+                    <span class="console-stat error" id="errorCount">✗ 0</span>
+                </div>
+            </div>
+            
+            <div class="console-body" id="consoleBody">
+                <div class="console-empty" id="consoleEmpty">
+                    <span class="empty-icon">⏳</span>
+                    <p>等待事件...</p>
+                </div>
+            </div>
+            
+            <div class="console-footer">
+                <button class="btn-icon-small" onclick="clearConsole()" title="清空">🗑️</button>
+                <label class="auto-scroll-toggle">
+                    <input type="checkbox" id="autoScrollConsole" checked onchange="toggleConsoleScroll()">
+                    自动滚动
+                </label>
+            </div>
+        </aside>
+        
+        <button class="right-panel-toggle" id="rightPanelToggle" onclick="toggleRightPanel()">📊</button>
+        
+        <!-- Add Account Modal -->
+        <div class="modal-overlay" id="loginModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 class="modal-title">🤖 添加 Telegram 账号</h2>
+                    <button class="modal-close" onclick="hideModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">📱 手机号</label>
+                        <input type="text" class="form-input" id="loginPhone" placeholder="+86...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🔢 API ID</label>
+                        <input type="number" class="form-input" id="loginApiId" placeholder="123456">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🔑 API Hash</label>
+                        <input type="text" class="form-input" id="loginApiHash" placeholder="abc123...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🔒 SOCKS5 代理 (可选)</label>
+                        <input type="text" class="form-input" id="loginProxy" placeholder="host:port:user:pass">
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="addAccount()">➕ 添加账号</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Toast -->
+        <div id="toastContainer"></div>
+    </div>
+    
+    <script>
+        // ==================== State ====================
+        let currentPhone = null;
+        let configModified = false;
+        let logBuffer = [];
+        let consoleEvents = [];
+        let eventCounts = { success: 0, warning: 0, error: 0 };
+        let autoScrollConsole = true;
+        let uptimeSeconds = 0;
+        let uptimeInterval = null;
+        
+        // Prompt Presets
+        const promptPresets = {
+            '路人': '你是一个安静的群聊成员，平时很少说话，只在看到抽奖链接时才会活跃参与。',
+            '水军': '你是一个活跃的群聊成员，经常发言聊天，热衷于参与各种抽奖活动，性格开朗健谈。',
+            '专业': '你是一个专业的抽奖爱好者，精通各种抽奖技巧，参与抽奖时认真仔细，从不放过任何机会。'
+        };
+        
+        // ==================== Socket ====================
+        const socket = io();
+        
+        socket.on('connect', () => {
+            addConsoleEvent('success', '系统', '已连接到服务器');
+        });
+        
+        socket.on('disconnect', () => {
+            addConsoleEvent('warning', '系统', '与服务器断开连接');
+        });
+        
+        socket.on('log_update', data => {
+            const level = data.level || 'info';
+            const timestamp = data.timestamp ? data.timestamp.split('T')[1].split('.')[0] : '00:00:00';
+            const line = `[${timestamp}] ${data.message}`;
+            logBuffer.push({ text: line, level: level });
+            
+            // Categorize event
+            if (level === 'success') {
+                eventCounts.success++;
+            } else if (level === 'error' || level === 'warn') {
+                eventCounts.warning++;
+            }
+            updateConsoleCounts();
+            
+            renderConsole();
+        });
+        
+        // ==================== Console Functions ====================
+        function addConsoleEvent(type, source, message) {
+            const time = new Date().toTimeString().split(' ')[0];
+            const event = { type, source, message, time };
+            consoleEvents.unshift(event);
+            
+            if (consoleEvents.length > 100) consoleEvents.pop();
+            
+            eventCounts[type]++;
+            updateConsoleCounts();
+            renderConsole();
+        }
+        
+        function updateConsoleCounts() {
+            document.getElementById('successCount').textContent = `✓ ${eventCounts.success}`;
+            document.getElementById('warningCount').textContent = `⚠ ${eventCounts.warning}`;
+            document.getElementById('errorCount').textContent = `✗ ${eventCounts.error}`;
+        }
+        
+        function renderConsole() {
+            const body = document.getElementById('consoleBody');
+            const empty = document.getElementById('consoleEmpty');
+            
+            if (consoleEvents.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+            
+            empty.style.display = 'none';
+            
+            body.innerHTML = consoleEvents.map(e => `
+                <div class="console-event ${e.type}">
+                    <span class="event-time">${e.time}</span>
+                    <span class="event-source">${e.source}</span>
+                    <span class="event-message">${escapeHtml(e.message)}</span>
+                </div>
+            `).join('');
+            
+            if (autoScrollConsole) {
+                body.scrollTop = 0;
+            }
+        }
+        
+        function clearConsole() {
+            consoleEvents = [];
+            eventCounts = { success: 0, warning: 0, error: 0 };
+            updateConsoleCounts();
+            renderConsole();
+        }
+        
+        function toggleConsoleScroll() {
+            autoScrollConsole = document.getElementById('autoScrollConsole').checked;
+        }
+        
+        // ==================== Tag Input Component ====================
+        class TagInput {
+            constructor(containerId, hiddenInputId, tagType = 'allow') {
+                this.container = document.getElementById(containerId);
+                this.hiddenInput = document.getElementById(hiddenInputId);
+                this.tagType = tagType;
+                this.tags = [];
+                this.init();
+            }
+            
+            init() {
+                if (!this.container) return;
+                
+                this.wrapper = document.createElement('div');
+                this.wrapper.className = 'tag-input-wrapper';
+                this.wrapper.innerHTML = `
+                    <div class="tag-list"></div>
+                    <input type="text" class="tag-input" placeholder="输入后按回车">
+                `;
+                this.container.appendChild(this.wrapper);
+                
+                this.tagList = this.wrapper.querySelector('.tag-list');
+                this.input = this.wrapper.querySelector('.tag-input');
+                
+                this.input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.addTag(this.input.value.trim());
+                    }
+                });
+                
+                this.input.addEventListener('blur', () => {
+                    if (this.input.value.trim()) {
+                        this.addTag(this.input.value.trim());
+                    }
+                });
+            }
+            
+            addTag(value) {
+                if (!value || this.tags.includes(value)) return;
+                this.tags.push(value);
+                this.render();
+                this.updateHidden();
+            }
+            
+            removeTag(index) {
+                this.tags.splice(index, 1);
+                this.render();
+                this.updateHidden();
+            }
+            
+            render() {
+                const tagClass = this.tagType === 'block' ? 'tag tag-block' : 'tag tag-allow';
+                this.tagList.innerHTML = this.tags.map((tag, i) => `
+                    <span class="${tagClass}">
+                        ${escapeHtml(tag)}
+                        <span class="tag-remove" onclick="removeTagFromInput('${this.container.id}', ${i})">×</span>
+                    </span>
+                `).join('');
+            }
+            
+            updateHidden() {
+                if (this.hiddenInput) {
+                    this.hiddenInput.value = this.tags.join('\n');
+                }
+            }
+            
+            setTags(arr) {
+                this.tags = Array.isArray(arr) ? arr : [];
+                this.render();
+                this.updateHidden();
+            }
+        }
+        
+        const tagInputs = {};
+        
+        function removeTagFromInput(containerId, index) {
+            if (tagInputs[containerId]) {
+                tagInputs[containerId].removeTag(index);
+            }
+        }
+        
+        function initTagInputs() {
+            const allowContainer = document.getElementById('allowTagsContainer');
+            const blockContainer = document.getElementById('blockTagsContainer');
+            
+            if (allowContainer) {
+                tagInputs['allowTagsContainer'] = new TagInput('allowTagsContainer', 'conf_allow', 'allow');
+            }
+            if (blockContainer) {
+                tagInputs['blockTagsContainer'] = new TagInput('blockTagsContainer', 'conf_block', 'block');
+            }
+        }
+        
+        // ==================== Prompt Functions ====================
+        function loadPrompt(type) {
+            const preset = promptPresets[type];
+            if (preset) {
+                document.getElementById('strategyPrompt').value = preset;
+                updateRiskLevel();
+                markModified();
+                showToast(`已加载「${type}」人设`);
+            }
+        }
+        
+        function updateRiskLevel() {
+            const prompt = document.getElementById('strategyPrompt').value;
+            const riskBar = document.getElementById('riskBar');
+            const riskValue = document.getElementById('riskValue');
+            
+            // Simple risk calculation
+            let risk = 20;
+            if (prompt.length > 100) risk += 10;
+            if (prompt.includes('疯狂') || prompt.includes('大量')) risk += 20;
+            if (prompt.includes('秒回') || prompt.includes('立即')) risk += 15;
+            if (prompt.includes('广告')) risk += 25;
+            risk = Math.min(risk, 100);
+            
+            riskBar.style.width = risk + '%';
+            
+            if (risk < 40) {
+                riskValue.textContent = '低 🟢';
+                riskBar.style.background = '#10b981';
+            } else if (risk < 70) {
+                riskValue.textContent = '中 🟡';
+                riskBar.style.background = '#f59e0b';
+            } else {
+                riskValue.textContent = '高 🔴';
+                riskBar.style.background = '#ef4444';
+            }
+        }
+        
+        // ==================== Account Functions ====================
+        async function loadAccounts() {
+            const res = await fetch('/api/accounts');
+            const list = await res.json();
+            
+            document.getElementById('accountCount').textContent = list.length;
+            document.getElementById('g_active').textContent = list.filter(a => a.water_running || a.giveaway_running).length;
+            
+            const container = document.getElementById('accountList');
+            container.innerHTML = list.map(acc => `
+                <div class="account-item ${currentPhone === acc.phone ? 'active' : ''}" 
+                     onclick="selectAccount('${acc.phone}')">
+                    <div class="item-indicator ${acc.giveaway_running ? 'running' : (acc.water_running ? 'running' : 'stopped')}"></div>
+                    <div class="item-info">
+                        <span class="item-phone">${acc.phone}</span>
+                        <span class="item-status">${acc.giveaway_running ? '抽奖中' : (acc.water_running ? '水群中' : '已停止')}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function selectAccount(phone) {
+            // 清空之前账户的事件日志
+            consoleEvents = [];
+            eventCounts = { success: 0, warning: 0, error: 0 };
+            updateConsoleCounts();
+            renderConsole();
+            
+            currentPhone = phone;
+            
+            // 先初始化TagInput
+            initTagInputs();
+            
+            // 再加载配置（会在配置中设置关键词）
+            await loadConfig(phone);
+            
+            loadConsoleHistory();
+            updateHealthDisplay();
+            
+            // Update header
+            document.getElementById('briefPhone').textContent = phone;
+            document.getElementById('briefStatus').textContent = '就绪';
+        }
+        
+        async function loadConfig(phone) {
+            const res = await fetch(`/api/config/${phone}`);
+            const d = await res.json();
+            
+            document.getElementById('conf_proxy').value = d.proxy || '';
+            document.getElementById('conf_monitor').value = d.monitor_channel || '';
+            document.getElementById('conf_ai_key').value = d.ai_key || '';
+            document.getElementById('conf_min').value = d.min_delay || 120;
+            document.getElementById('conf_max').value = d.max_delay || 240;
+            document.getElementById('conf_groups').value = (d.target_groups || []).join('\n');
+            document.getElementById('strategyPrompt').value = d.system_prompt || '';
+            
+            if (tagInputs['allowTagsContainer']) {
+                tagInputs['allowTagsContainer'].setTags(d.allow_keywords || []);
+            }
+            if (tagInputs['blockTagsContainer']) {
+                tagInputs['blockTagsContainer'].setTags(d.block_keywords || []);
+            }
+            
+            updateRiskLevel();
+        }
+        
+        async function saveConfig() {
+            const data = {
+                proxy: document.getElementById('conf_proxy').value.trim(),
+                monitor_channel: document.getElementById('conf_monitor').value.trim(),
+                ai_key: document.getElementById('conf_ai_key').value.trim(),
+                min_delay: parseInt(document.getElementById('conf_min').value) || 120,
+                max_delay: parseInt(document.getElementById('conf_max').value) || 240,
+                target_groups: document.getElementById('conf_groups').value.split('\n').map(s => s.trim()).filter(s => s),
+                system_prompt: document.getElementById('strategyPrompt').value,
+                allow_keywords: tagInputs['allowTagsContainer']?.getTags() || [],
+                block_keywords: tagInputs['blockTagsContainer']?.getTags() || []
+            };
+            
+            await fetch(`/api/config/${currentPhone}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            configModified = false;
+            showToast('✅ 配置已保存');
+        }
+        
+        // ==================== Control Functions ====================
+        async function startAll() {
+            if (!currentPhone) {
+                showToast('❌ 请先选择账号');
+                return;
+            }
+            
+            document.getElementById('startAllBtn').style.display = 'none';
+            document.getElementById('stopAllBtn').style.display = 'flex';
+            document.getElementById('breathingIndicator').classList.add('active');
+            
+            // Start water
+            addConsoleEvent('success', '系统', '启动水群任务...');
+            await fetch('/api/water/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: currentPhone})
+            });
+            
+            // Start giveaway
+            await fetch('/api/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: currentPhone, type: 'giveaway'})
+            });
+            
+            addConsoleEvent('success', '系统', '任务已启动');
+            startUptimeCounter();
+        }
+        
+        async function stopAll() {
+            if (!currentPhone) return;
+            
+            document.getElementById('startAllBtn').style.display = 'flex';
+            document.getElementById('stopAllBtn').style.display = 'none';
+            document.getElementById('breathingIndicator').classList.remove('active');
+            
+            await fetch('/api/water/stop', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: currentPhone})
+            });
+            
+            await fetch('/api/stop', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: currentPhone, type: 'giveaway'})
+            });
+            
+            addConsoleEvent('warning', '系统', '任务已暂停');
+            stopUptimeCounter();
+        }
+        
+        function startUptimeCounter() {
+            uptimeSeconds = 0;
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            uptimeInterval = setInterval(() => {
+                uptimeSeconds++;
+            }, 1000);
+        }
+        
+        function stopUptimeCounter() {
+            if (uptimeInterval) {
+                clearInterval(uptimeInterval);
+                uptimeInterval = null;
+            }
+        }
+        
+        // ==================== Backfill ====================
+        async function runBackfill() {
+            if (!currentPhone) {
+                showToast('❌ 请先选择账号');
+                return;
+            }
+            
+            const days = parseInt(document.getElementById('backfillDays').value);
+            
+            addConsoleEvent('info', '补录', `开始扫描最近${days}天的抽奖...`);
+            
+            await fetch('/api/giveaway/backfill', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: currentPhone, days})
+            });
+            
+            showToast('🚀 补录任务已启动');
+        }
+        
+        // ==================== UI Helpers ====================
+        function toggleSettings() {
+            const body = document.getElementById('settingsBody');
+            const icon = document.getElementById('settingsToggle');
+            body.style.display = body.style.display === 'none' ? 'block' : 'none';
+            icon.textContent = body.style.display === 'none' ? '▼' : '▲';
+        }
+        
+        function togglePassword(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+        
+        function toggleRightPanel() {
+            document.getElementById('rightPanel').classList.toggle('expanded');
+        }
+        
+        function markModified() {
+            configModified = true;
+        }
+        
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function loadConsoleHistory() {
+            if (!currentPhone) return;
+            
+            fetch(`/api/logs/${currentPhone}`)
+                .then(res => res.text())
+                .then(text => {
+                    if (text && text !== '无日志内容') {
+                        const lines = text.split('\n').filter(l => l.trim());
+                        lines.slice(-50).forEach(line => {
+                            let type = 'info';
+                            if (line.includes('成功') || line.includes('✅')) type = 'success';
+                            else if (line.includes('失败') || line.includes('错误') || line.includes('❌')) type = 'error';
+                            else if (line.includes('警告') || line.includes('⚠')) type = 'warning';
+                            
+                            const match = line.match(/\[(\d{2}:\d{2}:\d{2})\]/);
+                            const time = match ? match[1] : '00:00:00';
+                            
+                            consoleEvents.unshift({ type, source: '历史', message: line, time });
+                            if (consoleEvents.length > 100) consoleEvents.pop();
+                            eventCounts[type]++;
+                        });
+                        updateConsoleCounts();
+                        renderConsole();
+                    }
+                });
+        }
+        
+        function updateHealthDisplay() {
+            // Update health metrics based on config
+            const health = 100;
+            const activity = '适中';
+            const earnings = '0 次抽奖';
+            
+            document.getElementById('healthBar').style.width = health + '%';
+            document.getElementById('healthValue').textContent = health + '%';
+            document.getElementById('activityLevel').textContent = activity;
+            document.getElementById('todayEarnings').textContent = earnings;
+        }
+        
+        // ==================== Modal ====================
+        function showModal() {
+            document.getElementById('loginModal').classList.add('show');
+        }
+        
+        function hideModal() {
+            document.getElementById('loginModal').classList.remove('show');
+        }
+        
+        async function addAccount() {
+            const data = {
+                phone: document.getElementById('loginPhone').value,
+                api_id: parseInt(document.getElementById('loginApiId').value),
+                api_hash: document.getElementById('loginApiHash').value,
+                proxy: document.getElementById('loginProxy').value
+            };
+            
+            if (!data.phone || !data.api_id || !data.api_hash) {
+                showToast('❌ 请填写完整信息');
+                return;
+            }
+            
+            await fetch('/api/accounts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            hideModal();
+            loadAccounts();
+            showToast('✅ 账号添加成功');
+        }
+        
+        // ==================== Init ====================
+        async function init() {
+            await loadAccounts();
+            
+            // Global stats poll
+            setInterval(async () => {
+                try {
+                    const res = await fetch('/api/stats/global');
+                    const d = await res.json();
+                    document.getElementById('g_active').textContent = d.active_bots || 0;
+                    document.getElementById('g_msg').textContent = d.total_messages || 0;
+                    document.getElementById('g_giveaway').textContent = d.total_giveaway_entries || 0;
+                } catch {}
+            }, 5000);
+        }
+        
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  tg-matrix-bot:
+    build: .
+    container_name: tg_matrix_bot
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Hong_Kong
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  default:
+    name: tg_matrix_network

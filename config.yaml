@@ -1,0 +1,67 @@
+# Telegram Matrix Bot - 主配置文件
+# 单进程异步架构
+
+app:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+
+# 账号默认配置
+account_defaults:
+  # Telegram API (可在添加账号时指定)
+  api_id: 32841554
+  api_hash: bd3793da28922b292d34b3db68ccacf7
+  
+  # 代理设置
+  proxy: ""
+  
+  # 抽奖配置
+  monitor_channel: ""
+  allow_keywords:
+    - "抽奖"
+    - "giveaway"
+    - "空投"
+  block_keywords:
+    - "VIP"
+    - "付费"
+  
+  # 水群配置
+  target_groups: []
+  system_prompt: "你是群里的活跃成员，请友好地参与聊天。"
+  forbidden_words: []
+  
+  # AI配置
+  ai_key: ""
+  ai_max_length: 20
+  context_count: 5
+  
+  # 时间配置
+  min_delay: 120
+  max_delay: 240
+  sleep_start: 0
+  sleep_end: 8
+  messages_per_day: 21
+  
+  # 群组间隔
+  group_min: 40
+  group_max: 100
+  
+  # 账号权重 (1-10)
+  weight: 1
+
+# 抽奖配置
+giveaway:
+  success_keywords:
+    - "成功参加"
+    - "报名成功"
+    - "您已成功"
+    - "参与成功"
+    - "获得奖票"
+  ended_keywords:
+    - "活动已结束"
+    - "链接已失效"
+    - "验证失败"
+
+# 水群配置
+water:
+  pass

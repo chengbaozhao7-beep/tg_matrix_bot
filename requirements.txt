@@ -1,0 +1,26 @@
+# Telegram Matrix Bot - Requirements
+# 单进程异步架构
+
+# Web框架
+flask>=2.3.0
+flask-socketio>=5.3.0
+python-socketio>=5.8.0
+python-engineio>=4.5.0
+eventlet>=0.33.0
+
+# Telegram
+telethon>=1.24.0
+cryptg>=0.4.0
+
+# HTTP客户端
+aiohttp>=3.8.0
+
+# 配置和日志
+pyyaml>=6.0
+apscheduler>=3.10.0
+
+# 代理支持
+pysocks>=1.7.1
+
+# 工具
+requests>=2.28.0
