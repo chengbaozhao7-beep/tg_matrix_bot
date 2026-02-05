@@ -487,10 +487,11 @@
             const allowContainer = document.getElementById('allowTagsContainer');
             const blockContainer = document.getElementById('blockTagsContainer');
             
-            if (allowContainer) {
+            // 只初始化一次
+            if (allowContainer && !tagInputs['allowTagsContainer']) {
                 tagInputs['allowTagsContainer'] = new TagInput('allowTagsContainer', 'conf_allow', 'allow');
             }
-            if (blockContainer) {
+            if (blockContainer && !tagInputs['blockTagsContainer']) {
                 tagInputs['blockTagsContainer'] = new TagInput('blockTagsContainer', 'conf_block', 'block');
             }
         }
